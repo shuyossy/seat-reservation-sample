@@ -15,7 +15,11 @@ export default function SeatMap({
   onSeatAreaSelected,
   allSeats,
   onCancelReservation,
-  pendingAssignments
+  pendingAssignments,
+  infoOverlays,
+  infoOverlayRegistrationMode,
+  onInfoOverlayAreaSelected,
+  pendingInfoOverlays
 }) {
   const [bgImage] = useImage(BACKGROUND_IMAGE_URL);
   const [dragging, setDragging] = useState(false);
@@ -26,6 +30,9 @@ export default function SeatMap({
   const stageRef = useRef(null);
 
   const handleSeatClick = async (seat) => {
+    // seatRegistrationModeやinfoOverlayRegistrationModeがfalseのときのみ選択可
+    if (seatRegistrationMode || infoOverlayRegistrationMode) return;
+
     const reserved = reservations.find(r => r.seatId === seat.id && r.date === selectedDate);
     if (reserved) {
       const detail = await getReservationDetail(seat.id, selectedDate);
@@ -60,14 +67,16 @@ export default function SeatMap({
   };
 
   const handleMouseDown = (e) => {
-    if (!seatRegistrationMode || !selectedSeatForRegistration) return;
-    const pos = e.target.getStage().getPointerPosition();
-    setDragStart(pos);
-    setDragging(true);
+    // 座席登録モード or 情報領域登録モードでのみドラッグ可能
+    if ((seatRegistrationMode && selectedSeatForRegistration) || infoOverlayRegistrationMode) {
+      const pos = e.target.getStage().getPointerPosition();
+      setDragStart(pos);
+      setDragging(true);
+    }
   };
 
   const handleMouseMove = (e) => {
-    if (dragging && seatRegistrationMode && selectedSeatForRegistration && dragStart) {
+    if (dragging && (seatRegistrationMode && selectedSeatForRegistration || infoOverlayRegistrationMode) && dragStart) {
       const pos = e.target.getStage().getPointerPosition();
       const newRect = {
         x: Math.min(dragStart.x, pos.x),
@@ -80,36 +89,24 @@ export default function SeatMap({
   };
 
   const handleMouseUp = () => {
-    if (dragging && seatRegistrationMode && selectedSeatForRegistration && tempRect) {
-      // ドラッグ完了時にpendingAssignmentsへ追加
-      onSeatAreaSelected(selectedSeatForRegistration, tempRect);
+    if (dragging && tempRect) {
+      if (seatRegistrationMode && selectedSeatForRegistration) {
+        onSeatAreaSelected(selectedSeatForRegistration, tempRect);
+      } else if (infoOverlayRegistrationMode) {
+        onInfoOverlayAreaSelected(tempRect);
+      }
     }
     setDragging(false);
     setDragStart(null);
     setTempRect(null);
   };
 
-  // 座席表示ロジック:
-  // 1. pendingAssignmentsにある座席はその範囲を優先表示(未確定)
-  // 2. pendingAssignmentsにないがallSeatsで確定済みならその範囲表示
   const getSeatDisplayInfo = (seat) => {
     const pendingRect = pendingAssignments[seat.id];
     if (pendingRect) {
-      return {
-        x: pendingRect.x,
-        y: pendingRect.y,
-        width: pendingRect.width,
-        height: pendingRect.height,
-        isPending: true
-      };
-    } else if (seat.x !== null && seat.y !== null && seat.width !== null && seat.height !== null) {
-      return {
-        x: seat.x,
-        y: seat.y,
-        width: seat.width,
-        height: seat.height,
-        isPending: false
-      };
+      return { x: pendingRect.x, y: pendingRect.y, width: pendingRect.width, height: pendingRect.height, isPending: true };
+    } else if (seat.x != null && seat.y != null && seat.width != null && seat.height != null) {
+      return { x: seat.x, y: seat.y, width: seat.width, height: seat.height, isPending: false };
     }
     return null;
   };
@@ -127,16 +124,61 @@ export default function SeatMap({
       >
         <Layer>
           {bgImage && <KonvaImage image={bgImage} x={0} y={0} width={800} height={600} />}
-          
+
+          {/* 確定済み情報領域 */}
+          {infoOverlays.map(info => (
+            <React.Fragment key={info.id}>
+              <Rect
+                x={info.x}
+                y={info.y}
+                width={info.width}
+                height={info.height}
+                fill="rgba(255,255,0,0.3)"
+                stroke="#aaa"
+              />
+              <KonvaText
+                x={info.x}
+                y={info.y + info.height / 2 - 10}
+                text={info.name}
+                fontSize={12}
+                width={info.width}
+                align="center"
+              />
+            </React.Fragment>
+          ))}
+
+          {/* 仮登録中の情報領域 */}
+          {pendingInfoOverlays.map(o => (
+            <React.Fragment key={o.tempId}>
+              <Rect
+                x={o.x}
+                y={o.y}
+                width={o.width}
+                height={o.height}
+                fill="rgba(0,255,255,0.3)"
+                stroke="#aaa"
+              />
+              <KonvaText
+                x={o.x}
+                y={o.y + o.height / 2 - 10}
+                text={o.name ? `${o.name}\n(未確定)` : `(未確定)`}
+                fontSize={12}
+                width={o.width}
+                align="center"
+              />
+            </React.Fragment>
+          ))}
+
+          {/* 座席表示 */}
           {allSeats.map(seat => {
             const disp = getSeatDisplayInfo(seat);
-            if (!disp) return null; // まだ範囲未設定の座席は表示なし
+            if (!disp) return null;
 
             const reserved = isReserved(seat);
             const reservation = getReservationForSeat(seat);
             const selected = selectedSeats.some(s => s.id === seat.id);
 
-            let fillColor = '#ffffff';
+            let fillColor = 'transparent';
             if (reserved) fillColor = '#ff9999';
             else if (selected) fillColor = '#99ff99';
 
