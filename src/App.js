@@ -1,25 +1,28 @@
+// App.js
 import React, { useState, useEffect } from 'react';
-import SeatMap from './SeatMap';
-import ReservationForm from './ReservationForm';
-import { makeReservation, getReservationsByDate, updateSeat, cancelReservation, getSeats, getInfoOverlays, addInfoOverlay } from '../services/api';
+import { getSeats, getReservationsByDate, updateSeat, cancelReservation, getInfoOverlays, addInfoOverlay, makeReservation } from './services/api';
+import ReservationForm from './components/ReservationForm';
+import MapView from './components/MapView';
 
-export default function App() {
+function App() {
   const [selectedDate, setSelectedDate] = useState('2024-12-31');
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [showReservationForm, setShowReservationForm] = useState(false);
   const [reservations, setReservations] = useState([]);
   const [allSeats, setAllSeats] = useState([]);
 
+  // 座席登録モード
   const [seatRegistrationMode, setSeatRegistrationMode] = useState(false);
   const [selectedSeatForRegistration, setSelectedSeatForRegistration] = useState(null);
   const [pendingAssignments, setPendingAssignments] = useState({});
 
-  // 情報領域関連
-  const [infoOverlays, setInfoOverlays] = useState([]);
+  // 情報領域登録モード
   const [infoOverlayRegistrationMode, setInfoOverlayRegistrationMode] = useState(false);
   const [pendingInfoOverlays, setPendingInfoOverlays] = useState([]);
-  // pendingInfoOverlays: [{tempId: number, name: '', x,y,width,height}, ...]
-  // nameは後から入力可能にする
+  const [infoOverlays, setInfoOverlays] = useState([]);
+
+  // 予約詳細用モーダル
+  const [detailModalData, setDetailModalData] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -51,20 +54,19 @@ export default function App() {
     setReservations(r);
   };
 
-  const handleSeatAreaSelected = (seatId, rect) => {
-    setPendingAssignments(prev => ({ ...prev, [seatId]: rect }));
+  const onSeatAreaSelected = (seatId, rect) => {
+    setPendingAssignments(prev => ({...prev, [seatId]: rect}));
   };
 
   const handleRegisterConfirm = async () => {
-    for (const seatIdStr of Object.keys(pendingAssignments)) {
-      const seatId = parseInt(seatIdStr, 10);
+    for(const seatIdStr of Object.keys(pendingAssignments)) {
+      const seatId = parseInt(seatIdStr,10);
       const rect = pendingAssignments[seatId];
-      await updateSeat(seatId, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      await updateSeat(seatId, {x:rect.x, y:rect.y, width:rect.width, height:rect.height});
     }
     setPendingAssignments({});
     setSeatRegistrationMode(false);
     setSelectedSeatForRegistration(null);
-
     const updatedSeats = await getSeats();
     setAllSeats(updatedSeats);
   };
@@ -76,16 +78,14 @@ export default function App() {
   };
 
   // 情報領域登録関連
-  const handleInfoOverlayAreaSelected = (rect) => {
-    // 新規レコード追加
-    const tempId = Date.now(); // 一時的ID
-    const newOverlay = { tempId, name: '', ...rect };
+  const onInfoOverlayAreaSelected = (rect) => {
+    const tempId = Date.now();
+    const newOverlay = { tempId, name:'', ...rect };
     setPendingInfoOverlays(prev => [...prev, newOverlay]);
   };
 
   const handleInfoOverlayRegisterConfirm = async () => {
-    // 全てのpendingInfoOverlaysをDBへ追加
-    for (const ov of pendingInfoOverlays) {
+    for(const ov of pendingInfoOverlays) {
       await addInfoOverlay(ov.name, ov.x, ov.y, ov.width, ov.height);
     }
     setPendingInfoOverlays([]);
@@ -100,11 +100,20 @@ export default function App() {
   };
 
   const handleInfoOverlayNameChange = (tempId, newName) => {
-    setPendingInfoOverlays(prev => prev.map(o => o.tempId === tempId ? {...o, name: newName} : o));
+    setPendingInfoOverlays(prev => prev.map(o => o.tempId === tempId ? {...o, name:newName} : o));
+  };
+
+  const onShowDetailModal = (data) => {
+    setDetailModalData(data);
+  };
+
+  const handleDetailCancelReservation = async (seatId) => {
+    await handleCancelReservation(seatId);
+    setDetailModalData(null);
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{padding:'20px'}}>
       <h2>座席予約システム(サンプル)</h2>
       <div style={{marginBottom:'10px'}}>
         <label>日付選択: </label>
@@ -113,7 +122,6 @@ export default function App() {
 
       <div style={{ marginBottom: '10px' }}>
         <button onClick={() => {
-          // 他のモード解除
           setInfoOverlayRegistrationMode(false);
           if (seatRegistrationMode) {
             handleRegisterCancel();
@@ -125,7 +133,6 @@ export default function App() {
         </button>
 
         <button style={{marginLeft:'10px'}} onClick={() => {
-          // 他のモード解除
           setSeatRegistrationMode(false);
           setPendingAssignments({});
           if (infoOverlayRegistrationMode) {
@@ -138,22 +145,22 @@ export default function App() {
         </button>
       </div>
 
-      <SeatMap
+      <MapView
         selectedDate={selectedDate}
         reservations={reservations}
         selectedSeats={selectedSeats}
         onSelectedSeatsChange={setSelectedSeats}
         seatRegistrationMode={seatRegistrationMode}
         selectedSeatForRegistration={selectedSeatForRegistration}
-        onSeatAreaSelected={handleSeatAreaSelected}
+        onSeatAreaSelected={onSeatAreaSelected}
         allSeats={allSeats}
         onCancelReservation={handleCancelReservation}
         pendingAssignments={pendingAssignments}
         infoOverlays={infoOverlays}
-        // 情報領域登録モード関連
         infoOverlayRegistrationMode={infoOverlayRegistrationMode}
-        onInfoOverlayAreaSelected={handleInfoOverlayAreaSelected}
+        onInfoOverlayAreaSelected={onInfoOverlayAreaSelected}
         pendingInfoOverlays={pendingInfoOverlays}
+        onShowDetailModal={onShowDetailModal}
       />
 
       {!seatRegistrationMode && !infoOverlayRegistrationMode && (
@@ -204,7 +211,7 @@ export default function App() {
       {infoOverlayRegistrationMode && (
         <div style={{ marginTop:'20px', borderTop:'1px solid #ccc', paddingTop:'10px' }}>
           <h3>情報領域登録</h3>
-          <p>座席表上でドラッグして領域を指定してください。指定後、以下一覧で名前を入力可能です。</p>
+          <p>領域を指定すると一覧に追加され、名称を入力後「登録」で確定します。</p>
           {pendingInfoOverlays.length === 0 && <p>仮登録中の領域はありません。</p>}
           <ul style={{ listStyle:'none', padding:0 }}>
             {pendingInfoOverlays.map(o => (
@@ -241,6 +248,33 @@ export default function App() {
         onReserve={handleReserve}
         selectedDate={selectedDate}
       />
+
+      {detailModalData && (
+        <div style={detailModalStyle.backdrop}>
+          <div style={detailModalStyle.modal}>
+            <h3>予約詳細</h3>
+            <p>席名: {detailModalData.seatName}</p>
+            <p>氏名: {detailModalData.name}</p>
+            <p>部署: {detailModalData.department}</p>
+            <div style={{ marginTop: '10px' }}>
+              <button onClick={() => setDetailModalData(null)}>閉じる</button>
+              <button onClick={() => handleDetailCancelReservation(detailModalData.seatId)}>予約取消</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const detailModalStyle = {
+  backdrop: {
+    position:'fixed', top:0, left:0, width:'100%', height:'100%',
+    background:'rgba(0,0,0,0.3)', display:'flex', justifyContent:'center', alignItems:'center', zIndex: 9999
+  },
+  modal: {
+    background:'#fff', padding:'20px', borderRadius:'4px', minWidth:'300px'
+  }
+};
+
+export default App;

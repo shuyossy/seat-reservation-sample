@@ -1,4 +1,5 @@
 // services/api.js
+// Mock API: 将来的にバックエンドと置き換え
 
 let seatInfo = [];
 for (let i = 1; i <= 74; i++) {
@@ -6,8 +7,10 @@ for (let i = 1; i <= 74; i++) {
 }
 
 let reservations = [];
-
-let infoOverlays = [];
+let infoOverlays = [
+  { id: 1, name: "総務本部領域", x: 50, y: 50, width: 200, height: 100 },
+  { id: 2, name: "開発部門エリア", x: 300, y: 200, width: 150, height: 150 }
+];
 
 export async function getSeats() {
   return Promise.resolve(seatInfo);
@@ -49,7 +52,6 @@ export async function getInfoOverlays() {
   return Promise.resolve(infoOverlays);
 }
 
-// 新規情報領域追加
 export async function addInfoOverlay(name, x, y, width, height) {
   const newId = infoOverlays.length ? Math.max(...infoOverlays.map(o => o.id)) + 1 : 1;
   const newOverlay = { id: newId, name, x, y, width, height };
