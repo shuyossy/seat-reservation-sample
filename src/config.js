@@ -1,6 +1,8 @@
 // config.js
-export const BACKGROUND_IMAGE_URL = "/images/seatmap.png";
-// 背景画像。実際にはpublic/imagesに配置してください。
-// 全体サイズ 800x600を想定。
-export const MAP_WIDTH = 800;
-export const MAP_HEIGHT = 600;
+// このファイルは座席表画像のパスやマップサイズなどの設定値を管理します。
+
+export const BACKGROUND_IMAGE_URL = "/images/seatmap.png"; 
+// 座席表として表示する画像のURL。public/imagesに配置する想定。
+
+export const MAP_WIDTH = 800;  // マップの幅(px)
+export const MAP_HEIGHT = 600; // マップの高さ(px)

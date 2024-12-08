@@ -1,22 +1,31 @@
-// MapView.js
+// components/MapView.js
+// react-leafletで座席表を表示し、座席クリックで予約詳細表示、
+// ドラッグで範囲指定、情報領域表示などを行うコンポーネント。
+// このコードは幅や色などはApp側から制御される想定。
+// UI以外の処理(ドラッグ範囲取得、予約詳細取得など)も丁寧にコメント。
+
 import React, { useState, useEffect } from 'react';
 import { MapContainer, ImageOverlay, Rectangle, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { MAP_WIDTH, MAP_HEIGHT, BACKGROUND_IMAGE_URL } from '../config.js';
 import { getReservationDetail } from '../services/api.js';
 
-const bounds = [[0,0], [MAP_HEIGHT, MAP_WIDTH]];
+// 地図全体の境界
+const bounds = [[0,0], [MAP_HEIGHT, MAP_WIDTH]]; 
 
+// マップのインタラクション(ドラッグ、ズーム)を無効化/有効化するコンポーネント
 function DisableMapInteractions({ disabled }) {
   const map = useMap();
   useEffect(() => {
     if (disabled) {
+      // 登録モード中はマップ移動を無効化して、範囲選択に集中できるようにする
       map.dragging.disable();
       map.scrollWheelZoom.disable();
       map.doubleClickZoom.disable();
       map.touchZoom.disable();
       map.keyboard.disable();
     } else {
+      // 通常時はマップ操作を有効
       map.dragging.enable();
       map.scrollWheelZoom.enable();
       map.doubleClickZoom.enable();
@@ -28,6 +37,7 @@ function DisableMapInteractions({ disabled }) {
   return null;
 }
 
+// 座席範囲や情報領域のドラッグによる範囲選択を処理するコンポーネント
 function MapEventHandler({
   seatRegistrationMode, 
   selectedSeatForRegistration, 
@@ -46,12 +56,12 @@ function MapEventHandler({
     const container = map.getContainer();
 
     function onMouseDown(e) {
+      // 座席登録モードで座席選択済み、または情報領域登録モードのときに範囲選択開始
       if ((seatRegistrationMode && selectedSeatForRegistration) || infoOverlayRegistrationMode) {
-        // 座席範囲・情報領域登録中のみドラッグ開始
         const rect = container.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        // CRS.Simpleでmap.latLngToLayerPointを用いて座標変換
+        // コンテナ内座標からマップ上のlatlng取得
         const latlng = map.containerPointToLatLng([x,y]);
         setDragging(true);
         setDragStart(latlng);
@@ -59,6 +69,7 @@ function MapEventHandler({
     }
 
     function onMouseMove(e) {
+      // ドラッグ中かつマウスボタン押下中は矩形範囲更新
       if (dragging && dragStart && e.buttons === 1) {
         const rect = container.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -70,13 +81,17 @@ function MapEventHandler({
     }
 
     function onMouseUp(e) {
+      // ドラッグ終了時、tempRectがあれば範囲確定
       if (dragging && tempRect) {
         if (seatRegistrationMode && selectedSeatForRegistration) {
+          // 座席範囲決定
           onSeatAreaSelected(selectedSeatForRegistration, tempRect);
         } else if (infoOverlayRegistrationMode) {
+          // 情報領域範囲決定
           onInfoOverlayAreaSelected(tempRect);
         }
       }
+      // 状態リセット
       setDragging(false);
       setDragStart(null);
       setTempRect(null);
@@ -103,6 +118,8 @@ function MapEventHandler({
 }
 
 function createRectFromPoints(p1, p2) {
+  // 2点のlatlngから矩形範囲(x,y,width,height)を求める
+  // p1,p2はlat(lng),lng(lat)で座標表現されるがCRS.Simpleを使うので単純なx,y扱い
   const x1 = p1.lng; const y1 = p1.lat;
   const x2 = p2.lng; const y2 = p2.lat;
   const x = Math.min(x1,x2);
@@ -130,14 +147,18 @@ export default function MapView({
   const [dragStart, setDragStart] = useState(null);
   const [tempRect, setTempRect] = useState(null);
 
+  // 指定日付で予約済みか判定
   const isReserved = (seat) => reservations.some(r => r.seatId === seat.id && r.date === selectedDate);
+  // 座席の予約詳細を取得
   const getReservationForSeat = (seat) => reservations.find(r => r.seatId === seat.id && r.date === selectedDate);
 
   const handleSeatClick = async (seat) => {
-    if (seatRegistrationMode || infoOverlayRegistrationMode) return; // 登録モード中はクリック無効
+    // 座席登録モードや情報領域登録モード中は座席クリック無効
+    if (seatRegistrationMode || infoOverlayRegistrationMode) return;
 
     const reserved = isReserved(seat);
     if (reserved) {
+      // 予約済み座席をクリックで詳細表示
       const detail = await getReservationDetail(seat.id, selectedDate);
       onShowDetailModal({
         seatId: seat.id,
@@ -146,6 +167,7 @@ export default function MapView({
         department: detail.department
       });
     } else {
+      // 未予約席は選択状態をトグル
       let newSelected;
       if (selectedSeats.find(s => s.id === seat.id)) {
         newSelected = selectedSeats.filter(ss => ss.id !== seat.id);
@@ -156,6 +178,7 @@ export default function MapView({
     }
   };
 
+  // 座席表示情報(仮登録中はpendingRect優先)
   const getSeatDisplayInfo = (seat) => {
     const pendingRect = pendingAssignments[seat.id];
     if (pendingRect) {
@@ -166,14 +189,16 @@ export default function MapView({
     return null;
   };
 
+  // 座席背景色決定
   const seatFillColor = (seat, disp) => {
     const reserved = isReserved(seat);
     const selected = selectedSeats.some(s => s.id === seat.id);
-    if (reserved) return '#ff9999';
+    if (reserved) return '#ff9999'; 
     if (selected) return '#99ff99';
     return 'transparent';
   };
 
+  // 座席テキスト決定
   const seatDisplayText = (seat, disp) => {
     const reserved = isReserved(seat);
     const reservation = getReservationForSeat(seat);
@@ -190,6 +215,7 @@ export default function MapView({
     return txt;
   };
 
+  // LeafletのRectangle用に座標をLatLngBoundsに変換
   const rectBounds = (x,y,w,h) => {
     const southWest = [y+h, x];
     const northEast = [y, x+w];
@@ -201,7 +227,8 @@ export default function MapView({
       center={[MAP_HEIGHT/2, MAP_WIDTH/2]}
       zoom={1}
       crs={L.CRS.Simple}
-      style={{ width:'800px', height:'600px', border:'1px solid #ccc' }}
+      // 幅はApp側で95%に、ここではwidth:100%
+      style={{ width:'100%', height:'600px', border:'1px solid #ccc', borderRadius:'4px', background:'#fff' }}
       minZoom={-1}
       maxZoom={4}
     >
@@ -271,6 +298,7 @@ export default function MapView({
       })}
 
       {tempRect && (
+        // ドラッグ中の仮選択範囲を青色破線で表示
         <Rectangle
           bounds={rectBounds(tempRect.x, tempRect.y, tempRect.width, tempRect.height)}
           pathOptions={{color:'blue', dashArray:'4,4', fill:false}}

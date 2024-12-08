@@ -1,19 +1,9 @@
+/* index.css */
+/* 全体の基本スタイル指定: 余白リセット、背景白、フォント指定 */
 body {
+    margin:0;
     font-family: sans-serif;
-    margin: 0;
-    padding: 0;
-  }
-  
-  .app-container {
-    padding: 20px;
-  }
-  
-  .modal-backdrop {
-    position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);
-    display:flex;align-items:center;justify-content:center;
-  }
-  
-  .modal-content {
-    background:#fff;padding:20px;border-radius:4px;min-width:300px;
+    background:#fff;
+    color:#000;
   }
   
