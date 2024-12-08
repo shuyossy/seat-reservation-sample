@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/seat-reservation-sample/static/css/main.d763ba48.css",
+    "main.js": "/seat-reservation-sample/static/js/main.6f71e595.js",
+    "index.html": "/seat-reservation-sample/index.html",
+    "main.d763ba48.css.map": "/seat-reservation-sample/static/css/main.d763ba48.css.map",
+    "main.6f71e595.js.map": "/seat-reservation-sample/static/js/main.6f71e595.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.d763ba48.css",
+    "static/js/main.6f71e595.js"
+  ]
+}
