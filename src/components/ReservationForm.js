@@ -1,23 +1,23 @@
 // components/ReservationForm.js
-// ユーザが座席を選択した後、予約を行うためのフォームダイアログ。
-// 氏名・部署を入力して"予約確定"を押すと、makeReservationが呼ばれ予約が作成される。
-// visible=trueで表示され、zIndex=9999で地図上より前面に表示する。
+// 座席予約フォームを表示するダイアログコンポーネント。
+// 選択した座席と日付を表示し、氏名・部署を入力した上で"予約確定"で予約を作成します。
+// zIndexを9999に設定し、マップより前面で表示します。
 
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography } from '@mui/material';
 
 export default function ReservationForm({ visible, onClose, selectedSeats, onReserve, selectedDate }) {
-  // ユーザ入力用状態変数
+  // 氏名と部署を入力するためのstate
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
 
-  // visibleがfalseまたは選択席なしなら表示しない
+  // visibleがfalseまたは選択席が無い場合は表示しない
   if(!visible || selectedSeats.length === 0) return null;
 
   const handleReserve = () => {
-    // "予約確定"ボタンでonReserve呼び出し、予約実行
+    // "予約確定"クリック時にonReserveコールバックで予約作成
     onReserve({ name, department });
-    // フォームリセット
+    // 入力値リセット
     setName('');
     setDepartment('');
   };
@@ -25,7 +25,7 @@ export default function ReservationForm({ visible, onClose, selectedSeats, onRes
   return (
     <Dialog open={visible} onClose={onClose} maxWidth="sm" fullWidth
       PaperProps={{
-        style: { zIndex:9999 } // モーダルを最前面に
+        style: { zIndex:9999 } // ダイアログを最前面
       }}
     >
       <DialogTitle>座席予約フォーム</DialogTitle>

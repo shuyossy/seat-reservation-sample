@@ -1,7 +1,9 @@
 // App.js
-// メインコンポーネント
+// アプリ全体のメインコンポーネントです。
+// ユーザ操作(日付選択、座席範囲登録、地割登録、予約フォーム表示、削除確認ダイアログなど)をまとめています。
+
 import React, { useState, useEffect } from 'react';
-import { getSeats, getReservationsByDate, updateSeat, cancelReservation, getInfoOverlays, addInfoOverlay, makeReservation } from './services/api';
+import { getSeats, getReservationsByDate, updateSeat, cancelReservation, getInfoOverlays, addInfoOverlay, makeReservation, removeInfoOverlay } from './services/api';
 import { ThemeProvider, createTheme, CssBaseline, AppBar, Toolbar, Typography, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import ReservationForm from './components/ReservationForm';
 import MapView from './components/MapView';
@@ -9,9 +11,10 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Form from 'react-bootstrap/Form';
 
+// テーマ定義：基本色#4078F2、背景白、文字黒
 const theme = createTheme({
   palette: {
-    primary: { main: '#4078F2' }, // 基本カラー#4078F2
+    primary: { main: '#4078F2' },
     background: { default: '#fff' },
     text: { primary: '#000' }
   }
@@ -20,28 +23,31 @@ const theme = createTheme({
 const detailModalPaperStyle = { zIndex:9999 };
 
 function App() {
-  // 日付、座席選択、予約フォーム表示、予約一覧、座席一覧など状態管理
+  // 日付、座席選択など基本状態管理
   const [selectedDate, setSelectedDate] = useState('2024-12-31');
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [showReservationForm, setShowReservationForm] = useState(false);
   const [reservations, setReservations] = useState([]);
   const [allSeats, setAllSeats] = useState([]);
 
-  // 座席登録モード関連
+  // 座席範囲登録モード
   const [seatRegistrationMode, setSeatRegistrationMode] = useState(false);
   const [selectedSeatForRegistration, setSelectedSeatForRegistration] = useState(null);
   const [pendingAssignments, setPendingAssignments] = useState({});
 
-  // 情報領域登録モード関連
+  // 情報領域(地割)登録モード
   const [infoOverlayRegistrationMode, setInfoOverlayRegistrationMode] = useState(false);
   const [pendingInfoOverlays, setPendingInfoOverlays] = useState([]);
   const [infoOverlays, setInfoOverlays] = useState([]);
 
-  // 予約詳細モーダル用データ
+  // 予約詳細モーダル表示用状態
   const [detailModalData, setDetailModalData] = useState(null);
 
+  // 情報領域削除確認用
+  const [selectedInfoOverlayForDelete, setSelectedInfoOverlayForDelete] = useState(null);
+
   useEffect(() => {
-    // selectedDateが変わるたびに、その日付の予約一覧を取得
+    // 日付変更時、その日付の予約一覧取得
     (async () => {
       const r = await getReservationsByDate(selectedDate);
       setReservations(r);
@@ -49,7 +55,7 @@ function App() {
   }, [selectedDate]);
 
   useEffect(() => {
-    // 初回マウント時に座席一覧と情報領域一覧を取得
+    // 初回表示時、座席一覧と情報領域一覧を取得
     (async () => {
       const s = await getSeats();
       setAllSeats(s);
@@ -59,7 +65,7 @@ function App() {
   }, []);
 
   const handleReserve = async ({ name, department }) => {
-    // 予約フォームで"予約確定"時に呼ばれる
+    // 予約フォームで"予約確定"押下時の予約作成処理
     await makeReservation(selectedSeats.map(s => s.id), selectedDate, name, department);
     setShowReservationForm(false);
     setSelectedSeats([]);
@@ -68,19 +74,21 @@ function App() {
   };
 
   const handleCancelReservation = async (seatId) => {
-    // 予約詳細モーダルからの取消処理や他箇所で利用
+    // 予約取消処理
     await cancelReservation(seatId, selectedDate);
     const r = await getReservationsByDate(selectedDate);
     setReservations(r);
   };
 
   const onSeatAreaSelected = (seatId, rect) => {
-    // 座席登録モードでドラッグ終了時に呼ばれ、仮登録範囲を保存
+    // 座席範囲ドラッグ完了時に呼ばれる
+    // pendingAssignmentsに即時反映し、これで座席表示が即座に更新されます。
     setPendingAssignments(prev => ({...prev, [seatId]: rect}));
   };
 
   const handleRegisterConfirm = async () => {
-    // 座席範囲登録モードで"登録完了"を押したらDB反映
+    // 座席範囲登録時の"登録完了"ボタン押下
+    // pendingAssignmentsにある範囲をDB反映
     for(const seatIdStr of Object.keys(pendingAssignments)) {
       const seatId = parseInt(seatIdStr,10);
       const rect = pendingAssignments[seatId];
@@ -94,21 +102,21 @@ function App() {
   };
 
   const handleRegisterCancel = () => {
-    // 座席登録モードで"キャンセル"を押したら登録中断
+    // 座席範囲登録"キャンセル"ボタン押下
     setPendingAssignments({});
     setSeatRegistrationMode(false);
     setSelectedSeatForRegistration(null);
   };
 
   const onInfoOverlayAreaSelected = (rect) => {
-    // 情報領域登録モードでドラッグ終了時に仮登録範囲追加
+    // 情報領域(地割)ドラッグ終了時に仮登録データ追加
     const tempId = Date.now();
     const newOverlay = { tempId, name:'', ...rect };
     setPendingInfoOverlays(prev => [...prev, newOverlay]);
   };
 
   const handleInfoOverlayRegisterConfirm = async () => {
-    // 情報領域"登録"押下でDB反映
+    // 地割登録"登録"ボタンで仮登録をDB反映
     for(const ov of pendingInfoOverlays) {
       await addInfoOverlay(ov.name, ov.x, ov.y, ov.width, ov.height);
     }
@@ -119,31 +127,55 @@ function App() {
   };
 
   const handleInfoOverlayRegisterCancel = () => {
-    // 情報領域登録"終了"押下で中断
+    // 地割登録"終了"で中断
     setPendingInfoOverlays([]);
     setInfoOverlayRegistrationMode(false);
   };
 
   const handleInfoOverlayNameChange = (tempId, newName) => {
-    // 情報領域名入力欄の変更に対応
+    // 仮登録情報領域の名称変更
     setPendingInfoOverlays(prev => prev.map(o => o.tempId === tempId ? {...o, name:newName} : o));
   };
 
   const onShowDetailModal = (data) => {
-    // 座席クリック時に予約詳細を表示するモーダル起動
+    // 予約詳細モーダル表示
     setDetailModalData(data);
   };
 
   const handleDetailCancelReservation = async (seatId) => {
-    // 予約詳細モーダルから直接予約取消可能
+    // 詳細モーダルから予約取消実行
     await handleCancelReservation(seatId);
     setDetailModalData(null);
   };
 
+  const onInfoOverlayClick = (overlay) => {
+    // 地割登録モード中、既存情報領域クリックで削除確認ダイアログ表示
+    setSelectedInfoOverlayForDelete(overlay);
+  };
+
+  const handleDeleteOverlayConfirm = async () => {
+    // 情報領域削除確認ダイアログで"削除"を押した場合
+    if(selectedInfoOverlayForDelete) {
+      await removeInfoOverlay(selectedInfoOverlayForDelete.id);
+      const info = await getInfoOverlays();
+      setInfoOverlays(info);
+    }
+    setSelectedInfoOverlayForDelete(null);
+  };
+
+  const handleDeleteOverlayCancel = () => {
+    // 情報領域削除確認ダイアログで"キャンセル"
+    setSelectedInfoOverlayForDelete(null);
+  };
+
+  // ボタン名は押しても名称変更しない
+  const seatRegButtonLabel = "座席範囲登録";
+  const infoRegButtonLabel = "地割登録";
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {/* ヘッダー。日付選択やモード切替ボタンあり */}
+      {/* ヘッダー：日付選択、座席範囲登録、地割登録ボタン */}
       <AppBar position="static" sx={{background:'#4078F2'}}>
         <Toolbar>
           <Typography variant="h6" sx={{flexGrow:1, color:'#fff'}}>
@@ -158,17 +190,17 @@ function App() {
             sx={{ background:'#fff', borderRadius:1, mr:2 }}
           />
           <Button variant={seatRegistrationMode ? "contained" : "outlined"} sx={{color:'#fff', borderColor:'#fff'}} onClick={() => {
-            // 座席登録モード切替
+            // 座席範囲登録モード切替
             setInfoOverlayRegistrationMode(false);
             if(seatRegistrationMode) {
               handleRegisterCancel();
             } else {
               setSeatRegistrationMode(true);
             }
-          }}>座席登録{seatRegistrationMode?'終了':'開始'}</Button>
+          }}>{seatRegButtonLabel}</Button>
 
           <Button variant={infoOverlayRegistrationMode ? "contained" : "outlined"} sx={{color:'#fff', borderColor:'#fff', ml:1}} onClick={() => {
-            // 情報領域登録モード切替
+            // 地割登録モード切替
             setSeatRegistrationMode(false);
             setPendingAssignments({});
             if(infoOverlayRegistrationMode) {
@@ -177,20 +209,12 @@ function App() {
               setInfoOverlayRegistrationMode(true);
             }
           }}>
-            情報領域登録{infoOverlayRegistrationMode?'終了':'開始'}
+            {infoRegButtonLabel}
           </Button>
         </Toolbar>
       </AppBar>
 
-      {/* レイアウト:
-         - 常時マップは画面中央、幅95%
-         - seatRegistrationMode時：マップ下に座席一覧を85%幅で中央表示し、
-           「座席範囲登録」を中央に、その右端に「登録完了」「キャンセル」ボタン配置
-         - infoOverlayRegistrationMode時：マップ下に85%幅で情報領域一覧表示（前回同様）
-         - 通常時：マップ下に予約フォームボタン
-      */}
-
-      {/* マップ表示部分: width:95%, 中央寄せ */}
+      {/* マップ表示：幅95%中央寄せ */}
       <div style={{width:'95%', margin:'0 auto', marginTop:'20px'}}>
         <MapView
           selectedDate={selectedDate}
@@ -208,23 +232,17 @@ function App() {
           onInfoOverlayAreaSelected={onInfoOverlayAreaSelected}
           pendingInfoOverlays={pendingInfoOverlays}
           onShowDetailModal={onShowDetailModal}
+          onInfoOverlayClick={onInfoOverlayClick}
         />
       </div>
 
-      {/* 座席登録モード時の座席一覧表示:
-          要件： 
-          - 「座席範囲登録」を中央に配置
-          - 「登録完了」「キャンセル」ボタンを右端に配置
-          これを実現するため、上部にフレックスレイアウトを用意する。 */}
+      {/* 座席登録モード時の座席一覧表示 */}
       {seatRegistrationMode && (
         <div style={{width:'85%', margin:'30px auto 0 auto', background:'#f8f9fa', padding:'20px', borderRadius:'4px'}}>
-          {/* 上部バー: 「座席範囲登録」を中央、右端にボタン */}
           <div style={{display:'flex', alignItems:'center'}}>
-            {/* flexGrow:1をもつdivで左側空間を確保、中央に文字配置のためテキストを中央寄せ */}
             <div style={{flexGrow:1, textAlign:'center'}}>
               <Typography variant="h6" gutterBottom>座席範囲登録</Typography>
             </div>
-            {/* 右端にボタン配置 */}
             <div style={{textAlign:'right'}}>
               <Button 
                 variant="contained"
@@ -238,9 +256,8 @@ function App() {
             </div>
           </div>
 
-          {/* ボタンとタイトルを上に置いたため、"座席範囲登録"はすでに中央に表示済み
-             次に座席一覧をその下に表示 */}
-          <ListGroup className="mt-3">
+          {/* 座席一覧スクロール対応 */}
+          <ListGroup className="mt-3" style={{maxHeight:'300px', overflowY:'auto'}}>
             {allSeats.map(seat => {
               const assigned = pendingAssignments[seat.id] ? " (仮登録中)" : (seat.x !== null ? " (登録済)" : "");
               return (
@@ -258,8 +275,7 @@ function App() {
         </div>
       )}
 
-      {/* 情報領域登録モード:
-         通常は前回同様に85%幅中央でリスト表示、下部に「登録」「終了」ボタン */}
+      {/* 地割登録モード時の情報領域一覧表示 */}
       {infoOverlayRegistrationMode && !seatRegistrationMode && (
         <div style={{width:'85%', margin:'30px auto 0 auto', background:'#f8f9fa', padding:'20px', borderRadius:'4px'}}>
           <Typography variant="h6" gutterBottom>情報領域登録</Typography>
@@ -269,7 +285,7 @@ function App() {
           {pendingInfoOverlays.length === 0 && (
             <Typography variant="body2" color="text.secondary">仮登録中の領域はありません。</Typography>
           )}
-          <ListGroup className="mt-2">
+          <ListGroup className="mt-2" style={{maxHeight:'300px', overflowY:'auto'}}>
             {pendingInfoOverlays.map(o => (
               <ListGroup.Item key={o.tempId}>
                 領域({o.x.toFixed(1)}, {o.y.toFixed(1)}, {o.width.toFixed(1)}x{o.height.toFixed(1)})
@@ -298,9 +314,7 @@ function App() {
         </div>
       )}
 
-      {/* 通常モード:
-         seatRegistrationModeやinfoOverlayRegistrationModeでなければ、
-         選択席があれば予約フォームボタンを表示 */}
+      {/* 通常モード時の予約フォームボタン表示 */}
       {!seatRegistrationMode && !infoOverlayRegistrationMode && (
         <div className="text-end mt-2" style={{width:'95%', margin:'0 auto'}}>
           <Button
@@ -337,6 +351,24 @@ function App() {
           <DialogActions>
             <Button onClick={()=>setDetailModalData(null)} variant="outlined">閉じる</Button>
             <Button onClick={()=>handleDetailCancelReservation(detailModalData.seatId)} variant="contained" color="error">予約取消</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {/* 情報領域削除確認ダイアログ */}
+      {selectedInfoOverlayForDelete && (
+        <Dialog open={true} onClose={handleDeleteOverlayCancel} maxWidth="xs" fullWidth
+          PaperProps={{style: { zIndex:9999 }}}
+        >
+          <DialogTitle>情報領域削除確認</DialogTitle>
+          <DialogContent dividers>
+            <Typography>
+              「{selectedInfoOverlayForDelete.name}」を削除しますか？
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteOverlayCancel} variant="outlined">キャンセル</Button>
+            <Button onClick={handleDeleteOverlayConfirm} variant="contained" color="error">削除</Button>
           </DialogActions>
         </Dialog>
       )}
