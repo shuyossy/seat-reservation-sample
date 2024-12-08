@@ -11,11 +11,8 @@ for (let i = 1; i <= 74; i++) {
 let reservations = [];
 // reservationsには予約情報を格納します。{id, seatId, date, name, department}等を保持します。
 
-let infoOverlays = [
-  // infoOverlaysには情報領域(地割)データを保持します。
-  { id: 1, name: "総務本部領域", x: 50, y: 50, width: 200, height: 100 },
-  { id: 2, name: "開発部門エリア", x: 300, y: 200, width: 150, height: 150 }
-];
+let infoOverlays = [];
+// infoOverlaysには情報領域(地割)データを保持します。
 
 export async function getSeats() {
   // 全座席一覧を取得して返す

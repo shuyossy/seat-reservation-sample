@@ -289,12 +289,15 @@ export default function MapView({
 
         const color = seatFillColor(seat, disp);
         const tooltipContent = getSeatTooltipContent(seat);
+        const rectPathOption = seatRegistrationMode
+            ? { color: 'blue', dashArray: '4,4', fill: false }
+            : { color: 'transparent', fill: true, dashArray: null, fillColor: color, fillOpacity: color === 'transparent' ? 0.3 : 0.3 };
 
         return (
           <Rectangle
             key={`seat-${seat.id}`}
             bounds={rectBounds(disp.x, disp.y, disp.width, disp.height)}
-            pathOptions={{color:'transparent', fillColor:color, fillOpacity: color==='transparent'? 0:0.3}}
+            pathOptions={rectPathOption}
             eventHandlers={{
               click: () => handleSeatClick(seat)
             }}
