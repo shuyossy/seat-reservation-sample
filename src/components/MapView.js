@@ -253,9 +253,11 @@ export default function MapView({
 
       {infoOverlays.map(info => (
         <Rectangle
-          key={`info-${info.id}`}
+          // infoOverlayRegistrationModeが変更されるたびに再レンダリングされるように促す
+          key={`info-${info.id}-${infoOverlayRegistrationMode}`}
           bounds={rectBounds(info.x, info.y, info.width, info.height)}
           pathOptions={{color:'#aaa', fillColor:'rgba(255,255,0,0.3)', fillOpacity:0.3}}
+          interactive={infoOverlayRegistrationMode}
           eventHandlers={{
             click: () => handleInfoOverlayClickInternal(info)
           }}
