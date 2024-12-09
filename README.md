@@ -31,4 +31,4 @@
 * 登録されている地割範囲を削除することができる機能です
 * 地割登録ボタンを押下し、登録されている地割を座席表から選択することで機能を利用できます
 
-![地割取消](readme_assets/images/image4.png)
+![地割取消](readme_assets/images/image5.png)
